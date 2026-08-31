@@ -105,7 +105,7 @@ func WriteCallerJSON(path, repoRoot string, value any) error {
 	if err != nil {
 		return err
 	}
-	if relative == "." || relative == ".." || strings.HasPrefix(relative, ".."+string(filepath.Separator)) {
+	if relative == "." || (relative != ".." && !strings.HasPrefix(relative, ".."+string(filepath.Separator))) {
 		return errors.New("caller-owned output must be outside the target repository")
 	}
 	encoded, err := json.MarshalIndent(value, "", "  ")
