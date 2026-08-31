@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 )
 
 type Operation struct {
@@ -104,7 +105,7 @@ func WriteCallerJSON(path, repoRoot string, value any) error {
 	if err != nil {
 		return err
 	}
-	if relative == "." || (relative != ".." && len(relative) >= 3 && relative[:3] != ".."+string(filepath.Separator)) && relative != ".." {
+	if relative == "." || relative == ".." || strings.HasPrefix(relative, ".."+string(filepath.Separator)) {
 		return errors.New("caller-owned output must be outside the target repository")
 	}
 	encoded, err := json.MarshalIndent(value, "", "  ")
