@@ -16,6 +16,11 @@ caller-owned output and must be generated before an explicit apply operation. Be
 the target repository must have zero writes. Unknown GitHub API or ruleset observability is
 preserved as `UNKNOWN` with all six required fields; it is never treated as closed.
 
+The executor exposes four stages: `plan` writes a deterministic manifest/dossier to a
+caller-owned path, `verify` evaluates observed policy evidence, `conformance` checks the
+canonical cases and repeatability, and `evidence` combines the exact inventory, runtime,
+test, and artifact measurements. None of these stages writes the target repository.
+
 ## Status precedence
 
 `REFUTED` outranks `UNKNOWN`, which outranks `CLOSED`. A single observed post-bootstrap

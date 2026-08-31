@@ -20,14 +20,58 @@ jobs:
         with:
           go-version: '1.27.x'
           cache: true
-      - name: Verify .gooo authority and PR policy
-        run: go run ./cmd/gooo-verify --contract .gooo/bootstrap.gooo --event "$GITHUB_EVENT_NAME" --output "$RUNNER_TEMP/gooo-bootstrap-evidence.json"
-      - name: Run Go tests
-        run: go test ./...
-      - name: Upload bootstrap evidence
+      - name: Build executor
+        run: |
+          mkdir -p "$RUNNER_TEMP/gooo-artifacts"
+          /usr/bin/time -f '%e %M' -o "$RUNNER_TEMP/build.time" go build -o "$RUNNER_TEMP/gooo" ./cmd/gooo-verify
+      - name: Run Go tests with exact counters
+        run: |
+          /usr/bin/time -f '%e %M' -o "$RUNNER_TEMP/test.time" sh -c 'go test -json -count=1 ./... > "$RUNNER_TEMP/go-test.json"'
+      - name: Verify canonical cases and deterministic plan
+        run: |
+          /usr/bin/time -f '%e %M' -o "$RUNNER_TEMP/conformance.time" "$RUNNER_TEMP/gooo" conformance \
+            --contract .gooo/bootstrap.gooo \
+            --input-digest "sha256:$GITHUB_SHA" \
+            --target "$GITHUB_REPOSITORY" \
+            --repo-root "$GITHUB_WORKSPACE" \
+            --output "$RUNNER_TEMP/gooo-artifacts/conformance.json"
+      - name: Verify PR-only policy through GitHub REST evidence
+        id: policy
+        continue-on-error: true
+        run: |
+          "$RUNNER_TEMP/gooo" verify \
+            --contract .gooo/bootstrap.gooo \
+            --input-digest "sha256:$GITHUB_SHA" \
+            --observe-github \
+            --repo "$GITHUB_REPOSITORY" \
+            --event "$GITHUB_EVENT_NAME" \
+            --ref "$GITHUB_REF" \
+            --sha "$GITHUB_SHA" \
+            --before "$GITHUB_EVENT_BEFORE" \
+            --output "$RUNNER_TEMP/gooo-artifacts/policy.json"
+      - name: Write complete evidence dossier
+        if: always()
+        run: |
+          "$RUNNER_TEMP/gooo" evidence \
+            --contract .gooo/bootstrap.gooo \
+            --policy "$RUNNER_TEMP/gooo-artifacts/policy.json" \
+            --input-digest "sha256:$GITHUB_SHA" \
+            --repo-root "$GITHUB_WORKSPACE" \
+            --build-time "$RUNNER_TEMP/build.time" \
+            --test-time "$RUNNER_TEMP/test.time" \
+            --conformance-time "$RUNNER_TEMP/conformance.time" \
+            --test-json "$RUNNER_TEMP/go-test.json" \
+            --artifact-dir "$RUNNER_TEMP/gooo-artifacts" \
+            --output "$RUNNER_TEMP/gooo-evidence.json"
+      - name: Fail if policy is not closed
+        if: steps.policy.outcome != 'success'
+        run: exit 1
+      - name: Upload evidence artifacts
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: gooo-bootstrap-evidence
-          path: ${{ runner.temp }}/gooo-bootstrap-evidence.json
+          name: gooo-evidence
+          path: |
+            ${{ runner.temp }}/gooo-evidence.json
+            ${{ runner.temp }}/gooo-artifacts/*
           if-no-files-found: error
