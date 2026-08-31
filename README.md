@@ -1,0 +1,22 @@
+# Gooo repository bootstrap
+
+This repository defines a machine-readable bootstrap contract for new Gooo repositories.
+The `.gooo` metacode owns the policy meaning; Go consumes it as an executor and verifier.
+
+The root commit is the single permitted `BOOTSTRAP_EXCEPTION`. After it, changes must
+arrive through pull requests. The CI workflow verifies the contract and uploads evidence
+for every run.
+
+The contract deliberately excludes this root `README.md` from inventory measurements.
+
+## Operating boundary
+
+The reusable contract separates planning from applying repository mutations. A plan is
+caller-owned output and must be generated before an explicit apply operation. Before apply,
+the target repository must have zero writes. Unknown GitHub API or ruleset observability is
+preserved as `UNKNOWN` with all six required fields; it is never treated as closed.
+
+## Status precedence
+
+`REFUTED` outranks `UNKNOWN`, which outranks `CLOSED`. A single observed post-bootstrap
+direct-main commit therefore refutes the policy even when other evidence is unavailable.
