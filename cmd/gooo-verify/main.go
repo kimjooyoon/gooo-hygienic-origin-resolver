@@ -46,6 +46,7 @@ func runVerify(args []string) {
 	directMain := flags.Int("post-bootstrap-direct-main", -1, "observed direct-main count; -1 means unknown")
 	githubAPI := flags.String("github-api", "insufficient", "observed or insufficient")
 	ruleset := flags.String("ruleset", "insufficient", "observed or insufficient")
+	allowUnknown := flags.Bool("allow-unknown", false, "write UNKNOWN evidence without failing the collection job")
 	if err := flags.Parse(args); err != nil {
 		fail(err)
 	}
@@ -78,7 +79,7 @@ func runVerify(args []string) {
 		Result:         result,
 	}
 	writeReport(*outputPath, ".", report)
-	if result.Status != gooo.StatusClosed {
+	if result.Status != gooo.StatusClosed && !(result.Status == gooo.StatusUnknown && *allowUnknown) {
 		fail(fmt.Errorf("policy status is %s", result.Status))
 	}
 }

@@ -23,25 +23,34 @@ jobs:
       - name: Build executor
         run: |
           mkdir -p "$RUNNER_TEMP/gooo-artifacts"
-          /usr/bin/time -f '%e %M' -o "$RUNNER_TEMP/build.time" go build -o "$RUNNER_TEMP/gooo" ./cmd/gooo-verify
+          build_start=$(date +%s%3N)
+          /usr/bin/time -f '%M' -o "$RUNNER_TEMP/build.rss" go build -o "$RUNNER_TEMP/gooo" ./cmd/gooo-verify
+          build_end=$(date +%s%3N)
+          printf '%s %s\n' "$((build_end - build_start))" "$(cat "$RUNNER_TEMP/build.rss")" > "$RUNNER_TEMP/build.time"
       - name: Run Go tests with exact counters
         id: tests
         continue-on-error: true
         run: |
           set +e
-          /usr/bin/time -f '%e %M' -o "$RUNNER_TEMP/test.time" sh -c 'go test -json -count=1 ./... > "$RUNNER_TEMP/go-test.json"'
+          test_start=$(date +%s%3N)
+          /usr/bin/time -f '%M' -o "$RUNNER_TEMP/test.rss" sh -c 'go test -json -count=1 ./... > "$RUNNER_TEMP/go-test.json"'
           test_status=$?
+          test_end=$(date +%s%3N)
+          printf '%s %s\n' "$((test_end - test_start))" "$(cat "$RUNNER_TEMP/test.rss")" > "$RUNNER_TEMP/test.time"
           echo '--- go test JSON ---'
           sed -n '1,240p' "$RUNNER_TEMP/go-test.json"
           exit "$test_status"
       - name: Verify canonical cases and deterministic plan
         run: |
-          /usr/bin/time -f '%e %M' -o "$RUNNER_TEMP/conformance.time" "$RUNNER_TEMP/gooo" conformance \
+          conformance_start=$(date +%s%3N)
+          /usr/bin/time -f '%M' -o "$RUNNER_TEMP/conformance.rss" "$RUNNER_TEMP/gooo" conformance \
             --contract .gooo/bootstrap.gooo \
             --input-digest "sha256:$GITHUB_SHA" \
             --target "$GITHUB_REPOSITORY" \
             --repo-root "$GITHUB_WORKSPACE" \
             --output "$RUNNER_TEMP/gooo-artifacts/conformance.json"
+          conformance_end=$(date +%s%3N)
+          printf '%s %s\n' "$((conformance_end - conformance_start))" "$(cat "$RUNNER_TEMP/conformance.rss")" > "$RUNNER_TEMP/conformance.time"
       - name: Verify PR-only policy through GitHub REST evidence
         id: policy
         continue-on-error: true
@@ -55,7 +64,10 @@ jobs:
             --ref "$GITHUB_REF" \
             --sha "$GITHUB_SHA" \
             --before "$GITHUB_EVENT_BEFORE" \
+            --allow-unknown \
             --output "$RUNNER_TEMP/gooo-artifacts/policy.json"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: Write complete evidence dossier
         if: always()
         run: |

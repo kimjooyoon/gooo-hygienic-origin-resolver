@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"encoding/json"
 	"fmt"
-	"math"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -127,7 +126,7 @@ func ParseRuntimeMetric(path string) (RuntimeMetric, error) {
 	if len(fields) != 2 {
 		return RuntimeMetric{}, fmt.Errorf("runtime metric %s must contain seconds and peak RSS", path)
 	}
-	seconds, err := strconv.ParseFloat(fields[0], 64)
+	wallMS, err := strconv.ParseInt(fields[0], 10, 64)
 	if err != nil {
 		return RuntimeMetric{}, err
 	}
@@ -135,7 +134,7 @@ func ParseRuntimeMetric(path string) (RuntimeMetric, error) {
 	if err != nil {
 		return RuntimeMetric{}, err
 	}
-	return RuntimeMetric{WallMS: int64(math.Round(seconds * 1000)), PeakRSSKiB: rss}, nil
+	return RuntimeMetric{WallMS: wallMS, PeakRSSKiB: rss}, nil
 }
 
 func ParseGoTestJSON(path string) (TestMetrics, error) {
