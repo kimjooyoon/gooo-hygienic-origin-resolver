@@ -25,8 +25,15 @@ jobs:
           mkdir -p "$RUNNER_TEMP/gooo-artifacts"
           /usr/bin/time -f '%e %M' -o "$RUNNER_TEMP/build.time" go build -o "$RUNNER_TEMP/gooo" ./cmd/gooo-verify
       - name: Run Go tests with exact counters
+        id: tests
+        continue-on-error: true
         run: |
+          set +e
           /usr/bin/time -f '%e %M' -o "$RUNNER_TEMP/test.time" sh -c 'go test -json -count=1 ./... > "$RUNNER_TEMP/go-test.json"'
+          test_status=$?
+          echo '--- go test JSON ---'
+          sed -n '1,240p' "$RUNNER_TEMP/go-test.json"
+          exit "$test_status"
       - name: Verify canonical cases and deterministic plan
         run: |
           /usr/bin/time -f '%e %M' -o "$RUNNER_TEMP/conformance.time" "$RUNNER_TEMP/gooo" conformance \
@@ -64,7 +71,7 @@ jobs:
             --artifact-dir "$RUNNER_TEMP/gooo-artifacts" \
             --output "$RUNNER_TEMP/gooo-evidence.json"
       - name: Fail if policy is not closed
-        if: steps.policy.outcome != 'success'
+        if: steps.policy.outcome != 'success' || steps.tests.outcome != 'success'
         run: exit 1
       - name: Upload evidence artifacts
         if: always()
