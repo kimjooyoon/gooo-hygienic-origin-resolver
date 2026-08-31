@@ -24,7 +24,22 @@
       "plan_before_apply": true,
       "target_repo_writes_before_apply": 0,
       "caller_owned_outputs_only": true
-    }
+    },
+    "improvement_evidence": {
+      "same_input_digest_required": true,
+      "before_after_integer_pair_required": true,
+      "missing_evidence_status": "UNKNOWN"
+    },
+    "closure_guards": [
+      {
+        "claim": "global_language_self_improvement",
+        "without_evidence_status": "UNKNOWN"
+      },
+      {
+        "claim": "external_utility",
+        "without_evidence_status": "UNKNOWN"
+      }
+    ]
   },
   "inventory": {
     "exclude_paths": ["README.md"]

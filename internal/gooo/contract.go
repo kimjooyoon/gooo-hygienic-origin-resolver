@@ -32,6 +32,8 @@ type Policy struct {
 	StatusPrecedence        []Status      `json:"status_precedence"`
 	UnknownFields           []string      `json:"unknown_fields"`
 	ApplyBoundary           ApplyBoundary `json:"apply_boundary"`
+	ImprovementEvidence     ImprovementEvidence `json:"improvement_evidence"`
+	ClosureGuards           []ClosureGuard `json:"closure_guards"`
 }
 
 type BootstrapRule struct {
@@ -48,6 +50,17 @@ type ApplyBoundary struct {
 	PlanBeforeApply           bool `json:"plan_before_apply"`
 	TargetRepoWritesBefore   int  `json:"target_repo_writes_before_apply"`
 	CallerOwnedOutputsOnly   bool `json:"caller_owned_outputs_only"`
+}
+
+type ImprovementEvidence struct {
+	SameInputDigestRequired       bool   `json:"same_input_digest_required"`
+	BeforeAfterIntegerPairRequired bool  `json:"before_after_integer_pair_required"`
+	MissingEvidenceStatus         Status `json:"missing_evidence_status"`
+}
+
+type ClosureGuard struct {
+	Claim                string `json:"claim"`
+	WithoutEvidenceStatus Status `json:"without_evidence_status"`
 }
 
 type InventorySpec struct {
@@ -139,6 +152,12 @@ func (c Contract) Validate() error {
 	}
 	if !c.Policy.ApplyBoundary.PlanBeforeApply || c.Policy.ApplyBoundary.TargetRepoWritesBefore != 0 || !c.Policy.ApplyBoundary.CallerOwnedOutputsOnly {
 		return errors.New("apply boundary must plan first, write zero target files before apply, and use caller-owned outputs")
+	}
+	if !c.Policy.ImprovementEvidence.SameInputDigestRequired || !c.Policy.ImprovementEvidence.BeforeAfterIntegerPairRequired || c.Policy.ImprovementEvidence.MissingEvidenceStatus != StatusUnknown {
+		return errors.New("improvement claims require same-digest integer before/after evidence or UNKNOWN")
+	}
+	if len(c.Policy.ClosureGuards) != 2 || c.Policy.ClosureGuards[0].Claim != "global_language_self_improvement" || c.Policy.ClosureGuards[1].Claim != "external_utility" || c.Policy.ClosureGuards[0].WithoutEvidenceStatus != StatusUnknown || c.Policy.ClosureGuards[1].WithoutEvidenceStatus != StatusUnknown {
+		return errors.New("global language self-improvement and external utility require evidence before closure")
 	}
 	if len(c.Inventory.ExcludePaths) != 1 || c.Inventory.ExcludePaths[0] != "README.md" {
 		return errors.New("inventory must exclude root README.md")
