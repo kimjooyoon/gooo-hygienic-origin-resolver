@@ -10,7 +10,7 @@ permissions:
   pull-requests: read
 
 jobs:
-  bootstrap-policy:
+  origin-resolver:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -20,13 +20,40 @@ jobs:
         with:
           go-version: '1.27.x'
           cache: true
-      - name: Build executor
+      - name: Initialize caller-owned evidence directory
         run: |
           mkdir -p "$RUNNER_TEMP/gooo-artifacts"
+          printf '0 0\n' > "$RUNNER_TEMP/compile.time"
+          printf '0 0\n' > "$RUNNER_TEMP/build.time"
+          printf '0 0\n' > "$RUNNER_TEMP/test.time"
+          printf '0 0\n' > "$RUNNER_TEMP/conformance.time"
+          printf '0 0\n' > "$RUNNER_TEMP/integration.time"
+          : > "$RUNNER_TEMP/go-test.json"
+      - name: Compile all packages
+        id: compile
+        continue-on-error: true
+        run: |
+          set +e
+          compile_start=$(date +%s%3N)
+          /usr/bin/time -f '%M' -o "$RUNNER_TEMP/compile.rss" sh -c "go test -run '^$' ./..." > "$RUNNER_TEMP/compile.log" 2>&1
+          compile_status=$?
+          compile_end=$(date +%s%3N)
+          printf '%s %s\n' "$((compile_end - compile_start))" "$(cat "$RUNNER_TEMP/compile.rss" 2>/dev/null || printf '0')" > "$RUNNER_TEMP/compile.time"
+          sed -n '1,240p' "$RUNNER_TEMP/compile.log"
+          exit "$compile_status"
+      - name: Build policy and origin executors
+        id: build
+        continue-on-error: true
+        run: |
+          set +e
           build_start=$(date +%s%3N)
-          /usr/bin/time -f '%M' -o "$RUNNER_TEMP/build.rss" go build -o "$RUNNER_TEMP/gooo" ./cmd/gooo-verify
+          /usr/bin/time -f '%M' -o "$RUNNER_TEMP/build.rss" sh -c 'go build -o "$RUNNER_TEMP/gooo" ./cmd/gooo-verify && go build -o "$RUNNER_TEMP/gooo-origin" ./cmd/gooo-origin'
+          build_status=$?
           build_end=$(date +%s%3N)
-          printf '%s %s\n' "$((build_end - build_start))" "$(cat "$RUNNER_TEMP/build.rss")" > "$RUNNER_TEMP/build.time"
+          printf '%s %s\n' "$((build_end - build_start))" "$(cat "$RUNNER_TEMP/build.rss" 2>/dev/null || printf '0')" > "$RUNNER_TEMP/build.time"
+          exit "$build_status"
+        env:
+          RUNNER_TEMP: ${{ runner.temp }}
       - name: Run Go tests with exact counters
         id: tests
         continue-on-error: true
@@ -36,25 +63,54 @@ jobs:
           /usr/bin/time -f '%M' -o "$RUNNER_TEMP/test.rss" sh -c 'go test -json -count=1 ./... > "$RUNNER_TEMP/go-test.json"'
           test_status=$?
           test_end=$(date +%s%3N)
-          printf '%s %s\n' "$((test_end - test_start))" "$(cat "$RUNNER_TEMP/test.rss")" > "$RUNNER_TEMP/test.time"
-          echo '--- go test JSON ---'
-          sed -n '1,240p' "$RUNNER_TEMP/go-test.json"
+          printf '%s %s\n' "$((test_end - test_start))" "$(cat "$RUNNER_TEMP/test.rss" 2>/dev/null || printf '0')" > "$RUNNER_TEMP/test.time"
+          sed -n '1,320p' "$RUNNER_TEMP/go-test.json"
           exit "$test_status"
-      - name: Verify canonical cases and deterministic plan
+      - name: Verify canonical policy and origin replay cases
+        id: conformance
+        continue-on-error: true
         run: |
+          set +e
           conformance_start=$(date +%s%3N)
-          /usr/bin/time -f '%M' -o "$RUNNER_TEMP/conformance.rss" "$RUNNER_TEMP/gooo" conformance \
-            --contract .gooo/bootstrap.gooo \
-            --input-digest "sha256:$GITHUB_SHA" \
-            --target "$GITHUB_REPOSITORY" \
-            --repo-root "$GITHUB_WORKSPACE" \
-            --output "$RUNNER_TEMP/gooo-artifacts/conformance.json"
+          /usr/bin/time -f '%M' -o "$RUNNER_TEMP/conformance.rss" sh -c '
+            "$RUNNER_TEMP/gooo" conformance \
+              --contract .gooo/bootstrap.gooo \
+              --input-digest "sha256:$GITHUB_SHA" \
+              --target "$GITHUB_REPOSITORY" \
+              --repo-root "$GITHUB_WORKSPACE" \
+              --output "$RUNNER_TEMP/gooo-artifacts/bootstrap-conformance.json" &&
+            "$RUNNER_TEMP/gooo-origin" resolve \
+              --contract .gooo/origin-resolver.gooo \
+              --repo-root "$GITHUB_WORKSPACE" \
+              --output "$RUNNER_TEMP/gooo-artifacts/origin-resolve.json"
+          '
+          conformance_status=$?
           conformance_end=$(date +%s%3N)
-          printf '%s %s\n' "$((conformance_end - conformance_start))" "$(cat "$RUNNER_TEMP/conformance.rss")" > "$RUNNER_TEMP/conformance.time"
+          printf '%s %s\n' "$((conformance_end - conformance_start))" "$(cat "$RUNNER_TEMP/conformance.rss" 2>/dev/null || printf '0')" > "$RUNNER_TEMP/conformance.time"
+          exit "$conformance_status"
+      - name: Emit and build capture-free generated Go example
+        id: integration
+        continue-on-error: true
+        run: |
+          set +e
+          integration_start=$(date +%s%3N)
+          /usr/bin/time -f '%M' -o "$RUNNER_TEMP/integration.rss" sh -c '
+            "$RUNNER_TEMP/gooo-origin" emit \
+              --contract .gooo/origin-resolver.gooo \
+              --scenario normal-nested-expansion \
+              --repo-root "$GITHUB_WORKSPACE" \
+              --output "$RUNNER_TEMP/gooo-artifacts/generated_capture_free.go" &&
+            go build -o "$RUNNER_TEMP/generated-capture-free" "$RUNNER_TEMP/gooo-artifacts/generated_capture_free.go"
+          '
+          integration_status=$?
+          integration_end=$(date +%s%3N)
+          printf '%s %s\n' "$((integration_end - integration_start))" "$(cat "$RUNNER_TEMP/integration.rss" 2>/dev/null || printf '0')" > "$RUNNER_TEMP/integration.time"
+          exit "$integration_status"
       - name: Verify PR-only policy through GitHub REST evidence
         id: policy
         continue-on-error: true
         run: |
+          set +e
           "$RUNNER_TEMP/gooo" verify \
             --contract .gooo/bootstrap.gooo \
             --input-digest "sha256:$GITHUB_SHA" \
@@ -66,6 +122,8 @@ jobs:
             --before "$GITHUB_EVENT_BEFORE" \
             --allow-unknown \
             --output "$RUNNER_TEMP/gooo-artifacts/policy.json"
+          policy_status=$?
+          exit "$policy_status"
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: Write complete evidence dossier
@@ -76,14 +134,16 @@ jobs:
             --policy "$RUNNER_TEMP/gooo-artifacts/policy.json" \
             --input-digest "sha256:$GITHUB_SHA" \
             --repo-root "$GITHUB_WORKSPACE" \
+            --compile-time "$RUNNER_TEMP/compile.time" \
             --build-time "$RUNNER_TEMP/build.time" \
             --test-time "$RUNNER_TEMP/test.time" \
             --conformance-time "$RUNNER_TEMP/conformance.time" \
+            --integration-time "$RUNNER_TEMP/integration.time" \
             --test-json "$RUNNER_TEMP/go-test.json" \
             --artifact-dir "$RUNNER_TEMP/gooo-artifacts" \
             --output "$RUNNER_TEMP/gooo-evidence.json"
-      - name: Fail if policy is not closed
-        if: steps.policy.outcome != 'success' || steps.tests.outcome != 'success'
+      - name: Fail if any required stage is not closed
+        if: steps.compile.outcome != 'success' || steps.build.outcome != 'success' || steps.tests.outcome != 'success' || steps.conformance.outcome != 'success' || steps.integration.outcome != 'success' || steps.policy.outcome != 'success'
         run: exit 1
       - name: Upload evidence artifacts
         if: always()

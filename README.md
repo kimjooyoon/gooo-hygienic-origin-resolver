@@ -1,31 +1,47 @@
-# Gooo repository bootstrap
+# Gooo hygienic origin resolver
 
-This repository defines a machine-readable bootstrap contract for new Gooo repositories.
-The `.gooo` metacode owns the policy meaning; Go consumes it as an executor and verifier.
+This repository is an executable language slice for preventing name capture in
+metaprogramming. The authoritative semantics live in
+[`origin-resolver.gooo`](.gooo/origin-resolver.gooo): it declares declaration
+origins, expansion origins, scope edges, introduced symbols, reference symbols,
+status precedence, the denominator, and the generation plan.
 
-The root commit is the single permitted `BOOTSTRAP_EXCEPTION`. After it, changes must
-arrive through pull requests. The CI workflow verifies the contract and uploads evidence
-for every run.
+Go is limited to parsing the metacode, executing its declared judgments, and
+emitting structured Go syntax. It does not perform arbitrary string replacement.
 
-The contract deliberately excludes this root `README.md` from inventory measurements.
+## What is covered
 
-## Operating boundary
+The contract contains executable cases for:
 
-The reusable contract separates planning from applying repository mutations. A plan is
-caller-owned output and must be generated before an explicit apply operation. Before apply,
-the target repository must have zero writes. Unknown GitHub API or ruleset observability is
-preserved as `UNKNOWN` with all six required fields; it is never treated as closed.
+- normal nested expansion with deterministic alpha-renaming;
+- intended capture explicitly targeting a caller symbol;
+- unintended capture preserved as `REFUTED`;
+- missing origin proof preserved as `UNKNOWN` with all six required fields; and
+- replay with stable symbol identities, names, and capture decisions.
 
-The contract also makes improvement claims conservative: a same-input-digest integer
-before/after pair is required, otherwise the claim is `UNKNOWN`. Global language
-self-improvement and external utility likewise remain `UNKNOWN` without evidence.
+Every resolved symbol and reference carries an origin proof path and capture
+decision. `REFUTED > UNKNOWN > CLOSED` is read from the `.gooo` contract.
 
-The executor exposes four stages: `plan` writes a deterministic manifest/dossier to a
-caller-owned path, `verify` evaluates observed policy evidence, `conformance` checks the
-canonical cases and repeatability, and `evidence` combines the exact inventory, runtime,
-test, and artifact measurements. None of these stages writes the target repository.
+## CI-only verification
 
-## Status precedence
+GitHub Actions uses Go 1.27 to compile the packages, build both executors, run
+the tests, replay the declared cases, emit a generated capture-free Go example,
+and build that generated file. The uploaded evidence includes exact integer
+inventory, physical-line, generated-artifact, runtime, peak-RSS, and test-count
+measurements. Root `README.md` is excluded from inventory by the bootstrap
+contract.
 
-`REFUTED` outranks `UNKNOWN`, which outranks `CLOSED`. A single observed post-bootstrap
-direct-main commit therefore refutes the policy even when other evidence is unavailable.
+The repository began from `gooo-repository-bootstrap` v0.1.1. The bootstrap
+commit is the only direct-main exception; functional changes are PR-only.
+
+## Commands
+
+The commands below are intended for CI or a caller-owned output directory:
+
+```text
+go run ./cmd/gooo-origin resolve --output /caller/output/origin.json
+go run ./cmd/gooo-origin emit --scenario normal-nested-expansion --output /caller/output/generated.go
+```
+
+Reports and generated files must be outside the target repository. Local
+execution is not evidence of closure; GitHub Actions is the verification source.
