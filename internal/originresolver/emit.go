@@ -87,6 +87,7 @@ func EmitExample(spec Spec, scenarioID string) ([]byte, error) {
 		}
 		usedNames[evidence.EffectiveSpelling] = true
 		fmt.Fprintf(&source, "\t%s := %s\n", evidence.EffectiveSpelling, strconv.Quote(binding.Value))
+		fmt.Fprintf(&source, "\t_ = %s\n", evidence.EffectiveSpelling)
 	}
 	returnEvidence, ok := referenceEvidence[scenario.Example.ReturnReference]
 	if !ok {
