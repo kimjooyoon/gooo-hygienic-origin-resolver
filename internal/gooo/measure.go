@@ -11,27 +11,30 @@ import (
 )
 
 type InventoryMetrics struct {
-	GoFiles             int `json:"go_files"`
-	GoooFiles           int `json:"gooo_files"`
-	GoPhysicalLines     int `json:"go_physical_lines"`
-	GoooPhysicalLines   int `json:"gooo_physical_lines"`
-	Subdirectories      int `json:"subdirectories"`
-	RegularFiles        int `json:"regular_files"`
+	GoFiles           int `json:"go_files"`
+	GoooFiles         int `json:"gooo_files"`
+	GoPhysicalLines   int `json:"go_physical_lines"`
+	GoooPhysicalLines int `json:"gooo_physical_lines"`
+	Subdirectories    int `json:"subdirectories"`
+	RegularFiles      int `json:"regular_files"`
 }
 
 type RuntimeMetric struct {
-	WallMS      int64 `json:"wall_ms"`
-	PeakRSSKiB  int64 `json:"peak_rss_kib"`
+	WallMS     int64 `json:"wall_ms"`
+	PeakRSSKiB int64 `json:"peak_rss_kib"`
 }
 
 type RuntimeMetrics struct {
-	Build        RuntimeMetric `json:"build"`
-	Test         RuntimeMetric `json:"test"`
-	Conformance  RuntimeMetric `json:"conformance"`
+	Compile     RuntimeMetric `json:"compile"`
+	Build       RuntimeMetric `json:"build"`
+	Test        RuntimeMetric `json:"test"`
+	Conformance RuntimeMetric `json:"conformance"`
+	Integration RuntimeMetric `json:"integration"`
 }
 
 type TestMetrics struct {
 	Total    int `json:"total"`
+	Selected int `json:"selected"`
 	Executed int `json:"executed"`
 	Reused   int `json:"reused"`
 	Failed   int `json:"failed"`
@@ -147,9 +150,9 @@ func ParseGoTestJSON(path string) (TestMetrics, error) {
 	scanner := bufio.NewScanner(file)
 	for scanner.Scan() {
 		var event struct {
-			Action  string `json:"Action"`
-			Test    string `json:"Test"`
-			Output  string `json:"Output"`
+			Action string `json:"Action"`
+			Test   string `json:"Test"`
+			Output string `json:"Output"`
 		}
 		if err := json.Unmarshal(scanner.Bytes(), &event); err != nil {
 			metrics.Unknown++
@@ -159,10 +162,15 @@ func ParseGoTestJSON(path string) (TestMetrics, error) {
 		case "run":
 			if event.Test != "" {
 				metrics.Total++
+				metrics.Selected++
+			}
+		case "pass":
+			if event.Test != "" {
 				metrics.Executed++
 			}
 		case "fail":
 			if event.Test != "" {
+				metrics.Executed++
 				metrics.Failed++
 			}
 		case "output":

@@ -1,0 +1,155 @@
+{
+  "schema": "gooo.origin-resolver/v1",
+  "authority": "metacode",
+  "contract_id": "gooo-hygienic-origin-resolver",
+  "toolchain": {
+    "go": "1.27"
+  },
+  "semantics": {
+    "identity": {
+      "algorithm": "sha256",
+      "inputs": ["declaration_origin", "expansion_origin", "symbol_id"],
+      "delimiter": "|",
+      "prefix": "sym_"
+    },
+    "alpha_renaming": {
+      "fresh_policy": "fresh",
+      "separator": "__gooo_",
+      "identity_chars": 16
+    },
+    "capture_judgment": {
+      "fresh_collision": "ALPHA_RENAME",
+      "intended_target": "INTENDED_CAPTURE",
+      "no_collision": "CAPTURE_FREE",
+      "unintended_target": "UNINTENDED_CAPTURE",
+      "missing_origin": "UNKNOWN"
+    },
+    "status_precedence": ["REFUTED", "UNKNOWN", "CLOSED"],
+    "unknown": {
+      "stage": "resolve",
+      "step": "prove-symbol-origin",
+      "reason": "declaration or expansion origin is missing",
+      "unknown_class": "missing-origin",
+      "next_operation": "supply the missing origin and replay the same scenario",
+      "blocked_by": "incomplete-origin-proof"
+    },
+    "denominator": {
+      "scenarios": "all scenarios declared in this contract",
+      "symbols": "all declared, introduced, and reference symbols selected by each scenario",
+      "improvement": "only a same scenario/source/contract/toolchain digest before/after integer pair can close improvement"
+    },
+    "generation_plan": [
+      "parse this .gooo contract as structured data",
+      "compute stable identity from origin triples",
+      "walk declared scope edges to prove lexical visibility",
+      "alpha-rename only introduced fresh binders with visible collisions",
+      "resolve references by structured symbol identity rather than text replacement",
+      "emit Go syntax from the resolved symbol table",
+      "preserve REFUTED and UNKNOWN evidence in the report"
+    ],
+    "no_arbitrary_string_replacement": true
+  },
+  "declaration_origins": [
+    {"id": "origin.user.x", "source": "fixtures/caller.go", "line": 1, "column": 1, "label": "caller declaration x"},
+    {"id": "origin.macro.outer.x", "source": "fixtures/macro.gooo", "line": 10, "column": 5, "label": "outer expansion binder x"},
+    {"id": "origin.macro.inner.x", "source": "fixtures/macro.gooo", "line": 20, "column": 5, "label": "nested expansion binder x"},
+    {"id": "origin.macro.intended.tmp", "source": "fixtures/macro.gooo", "line": 30, "column": 5, "label": "intended capture helper"},
+    {"id": "origin.macro.refuted.x", "source": "fixtures/macro.gooo", "line": 40, "column": 5, "label": "fixed binder counterexample"}
+  ],
+  "reference_origins": [
+    {"id": "origin.ref.normal.outer", "source": "fixtures/macro.gooo", "line": 11, "column": 12, "label": "outer binder reference"},
+    {"id": "origin.ref.normal.inner", "source": "fixtures/macro.gooo", "line": 21, "column": 12, "label": "nested binder reference"},
+    {"id": "origin.ref.intended.x", "source": "fixtures/macro.gooo", "line": 31, "column": 12, "label": "intentional caller reference"},
+    {"id": "origin.ref.refuted.x", "source": "fixtures/macro.gooo", "line": 41, "column": 12, "label": "unintended capture reference"}
+  ],
+  "expansion_origins": [
+    {"id": "exp.source", "macro": "caller", "call_site": "fixtures/caller.go:1:1", "parent": ""},
+    {"id": "exp.normal.outer", "macro": "outer", "call_site": "fixtures/caller.go:2:1", "parent": "exp.source"},
+    {"id": "exp.normal.inner", "macro": "inner", "call_site": "fixtures/macro.gooo:20:1", "parent": "exp.normal.outer"},
+    {"id": "exp.intended", "macro": "capture-intentionally", "call_site": "fixtures/caller.go:3:1", "parent": "exp.source"},
+    {"id": "exp.refuted", "macro": "opaque-fixed", "call_site": "fixtures/caller.go:4:1", "parent": "exp.source"},
+    {"id": "exp.unknown", "macro": "incomplete", "call_site": "fixtures/caller.go:5:1", "parent": "exp.source"}
+  ],
+  "scope_edges": [
+    {"child": "normal.outer", "parent": "root", "kind": "expansion"},
+    {"child": "normal.inner", "parent": "normal.outer", "kind": "nested-expansion"},
+    {"child": "intended.call", "parent": "root", "kind": "expansion"},
+    {"child": "refuted.call", "parent": "root", "kind": "expansion"},
+    {"child": "unknown.call", "parent": "root", "kind": "expansion"}
+  ],
+  "declared_symbols": [
+    {"id": "user.x", "spelling": "x", "kind": "caller-binder", "declaration_origin": "origin.user.x", "expansion_origin": "exp.source", "scope": "root", "capture_policy": "existing"}
+  ],
+  "introduced_symbols": [
+    {"id": "normal.outer.x", "spelling": "x", "kind": "introduced-binder", "declaration_origin": "origin.macro.outer.x", "expansion_origin": "exp.normal.outer", "scope": "normal.outer", "capture_policy": "fresh"},
+    {"id": "normal.inner.x", "spelling": "x", "kind": "introduced-binder", "declaration_origin": "origin.macro.inner.x", "expansion_origin": "exp.normal.inner", "scope": "normal.inner", "capture_policy": "fresh"},
+    {"id": "intended.tmp", "spelling": "tmp", "kind": "introduced-binder", "declaration_origin": "origin.macro.intended.tmp", "expansion_origin": "exp.intended", "scope": "intended.call", "capture_policy": "fresh"},
+    {"id": "refuted.x", "spelling": "x", "kind": "introduced-binder", "declaration_origin": "origin.macro.refuted.x", "expansion_origin": "exp.refuted", "scope": "refuted.call", "capture_policy": "fixed"},
+    {"id": "unknown.broken", "spelling": "broken", "kind": "introduced-binder", "declaration_origin": "", "expansion_origin": "exp.unknown", "scope": "unknown.call", "capture_policy": "fresh"}
+  ],
+  "reference_symbols": [
+    {"id": "normal.outer.ref", "spelling": "x", "reference_origin": "origin.ref.normal.outer", "expansion_origin": "exp.normal.outer", "scope": "normal.outer", "target_symbol": "normal.outer.x", "capture_policy": "fresh"},
+    {"id": "normal.inner.ref", "spelling": "x", "reference_origin": "origin.ref.normal.inner", "expansion_origin": "exp.normal.inner", "scope": "normal.inner", "target_symbol": "normal.inner.x", "capture_policy": "fresh"},
+    {"id": "intended.ref.x", "spelling": "x", "reference_origin": "origin.ref.intended.x", "expansion_origin": "exp.intended", "scope": "intended.call", "target_symbol": "user.x", "capture_policy": "intentional"},
+    {"id": "refuted.ref.x", "spelling": "x", "reference_origin": "origin.ref.refuted.x", "expansion_origin": "exp.refuted", "scope": "refuted.call", "target_symbol": "user.x", "capture_policy": "forbid"},
+    {"id": "unknown.ref.broken", "spelling": "broken", "reference_origin": "", "expansion_origin": "exp.unknown", "scope": "unknown.call", "target_symbol": "unknown.broken", "capture_policy": "fresh"}
+  ],
+  "scenarios": [
+    {
+      "id": "normal-nested-expansion",
+      "description": "nested fresh binders are alpha-renamed away from caller x",
+      "root_scope": "root",
+      "declared_symbols": ["user.x"],
+      "introduced_symbols": ["normal.outer.x", "normal.inner.x"],
+      "reference_symbols": ["normal.outer.ref", "normal.inner.ref"],
+      "expected_status": "CLOSED",
+      "example": {
+        "package": "main",
+        "function": "CaptureFree",
+        "bindings": [
+          {"symbol": "normal.outer.x", "value": "outer"},
+          {"symbol": "normal.inner.x", "value": "inner"}
+        ],
+        "return_reference": "normal.inner.ref"
+      }
+    },
+    {
+      "id": "intended-capture",
+      "description": "a reference explicitly targets the caller declaration",
+      "root_scope": "root",
+      "declared_symbols": ["user.x"],
+      "introduced_symbols": ["intended.tmp"],
+      "reference_symbols": ["intended.ref.x"],
+      "expected_status": "CLOSED"
+    },
+    {
+      "id": "unintended-capture",
+      "description": "an opaque fixed binder captures a caller reference",
+      "root_scope": "root",
+      "declared_symbols": ["user.x"],
+      "introduced_symbols": ["refuted.x"],
+      "reference_symbols": ["refuted.ref.x"],
+      "expected_status": "REFUTED"
+    },
+    {
+      "id": "missing-origin",
+      "description": "the incomplete origin proof remains UNKNOWN",
+      "root_scope": "root",
+      "declared_symbols": ["user.x"],
+      "introduced_symbols": ["unknown.broken"],
+      "reference_symbols": ["unknown.ref.broken"],
+      "expected_status": "UNKNOWN"
+    },
+    {
+      "id": "replay",
+      "description": "replaying the normal graph preserves identities and decisions",
+      "root_scope": "root",
+      "declared_symbols": ["user.x"],
+      "introduced_symbols": ["normal.outer.x", "normal.inner.x"],
+      "reference_symbols": ["normal.outer.ref", "normal.inner.ref"],
+      "expected_status": "CLOSED",
+      "replay_of": "normal-nested-expansion",
+      "expected_replay": true
+    }
+  ]
+}

@@ -9,7 +9,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/kimjooyoon/gooo-repository-bootstrap/internal/gooo"
+	"github.com/kimjooyoon/gooo-hygienic-origin-resolver/internal/gooo"
 )
 
 func main() {
@@ -138,10 +138,10 @@ func runConformance(args []string) {
 		fail(errors.New("same input digest did not produce identical manifest and dossier"))
 	}
 	report := struct {
-		Schema     string `json:"schema"`
-		Status     string `json:"status"`
+		Schema     string   `json:"schema"`
+		Status     string   `json:"status"`
 		Precedence []string `json:"precedence"`
-		Cases      int    `json:"canonical_cases"`
+		Cases      int      `json:"canonical_cases"`
 	}{
 		Schema:     "gooo.conformance/v1",
 		Status:     "PASS",
@@ -159,9 +159,11 @@ func runEvidence(args []string) {
 	repoRoot := flags.String("repo-root", ".", "target repository root")
 	outputPath := flags.String("output", "", "caller-owned evidence output")
 	artifactDir := flags.String("artifact-dir", "", "generated artifact directory")
+	compileTime := flags.String("compile-time", "", "compile runtime metric")
 	buildTime := flags.String("build-time", "", "build runtime metric")
 	testTime := flags.String("test-time", "", "test runtime metric")
 	conformanceTime := flags.String("conformance-time", "", "conformance runtime metric")
+	integrationTime := flags.String("integration-time", "", "integration runtime metric")
 	testJSON := flags.String("test-json", "", "go test -json output")
 	if err := flags.Parse(args); err != nil {
 		fail(err)
@@ -178,7 +180,15 @@ func runEvidence(args []string) {
 	if err != nil {
 		fail(err)
 	}
+	compileMetric, err := gooo.ParseRuntimeMetric(*compileTime)
+	if err != nil {
+		fail(err)
+	}
 	buildMetric, err := gooo.ParseRuntimeMetric(*buildTime)
+	if err != nil {
+		fail(err)
+	}
+	integrationMetric, err := gooo.ParseRuntimeMetric(*integrationTime)
 	if err != nil {
 		fail(err)
 	}
@@ -206,7 +216,7 @@ func runEvidence(args []string) {
 		PolicyStatus:                policy.Result.Status,
 		Unknown:                     policy.Result.Unknown,
 		Inventory:                   inventory,
-		Runtime:                     gooo.RuntimeMetrics{Build: buildMetric, Test: testMetric, Conformance: conformanceMetric},
+		Runtime:                     gooo.RuntimeMetrics{Compile: compileMetric, Build: buildMetric, Test: testMetric, Conformance: conformanceMetric, Integration: integrationMetric},
 		Tests:                       tests,
 		GeneratedArtifacts:          artifacts,
 		TargetRepoWritesBeforeApply: contract.Policy.ApplyBoundary.TargetRepoWritesBefore,

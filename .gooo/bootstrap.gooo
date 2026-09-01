@@ -47,9 +47,9 @@
   "measurements": {
     "file_classes": ["go", "gooo", "subdirectory", "regular_file"],
     "physical_lines": true,
-    "wall_ms": ["build", "test", "conformance"],
-    "peak_rss_kib": ["build", "test", "conformance"],
-    "test_counts": ["total", "executed", "reused", "failed", "unknown"],
+    "wall_ms": ["compile", "build", "test", "conformance", "integration"],
+    "peak_rss_kib": ["compile", "build", "test", "conformance", "integration"],
+    "test_counts": ["total", "selected", "executed", "reused", "failed", "unknown"],
     "generated_artifacts": ["count", "bytes"]
   },
   "canonical_cases": [
