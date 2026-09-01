@@ -77,6 +77,13 @@ type UnknownRule struct {
 	BlockedBy     string `json:"blocked_by"`
 }
 
+func (u UnknownRule) Validate() error {
+	if u.Stage == "" || u.Step == "" || u.Reason == "" || u.UnknownClass == "" || u.NextOperation == "" || u.BlockedBy == "" {
+		return errors.New("UNKNOWN must preserve stage, step, reason, unknown_class, next_operation, and blocked_by")
+	}
+	return nil
+}
+
 type Denominator struct {
 	Scenarios   string `json:"scenarios"`
 	Symbols     string `json:"symbols"`
