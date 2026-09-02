@@ -66,7 +66,7 @@ jobs:
           printf '%s %s\n' "$((test_end - test_start))" "$(cat "$RUNNER_TEMP/test.rss" 2>/dev/null || printf '0')" > "$RUNNER_TEMP/test.time"
           sed -n '1,320p' "$RUNNER_TEMP/go-test.json"
           exit "$test_status"
-      - name: Verify canonical policy and origin replay cases
+      - name: Verify policy and staged quasiquote conformance
         id: conformance
         continue-on-error: true
         run: |
@@ -82,7 +82,8 @@ jobs:
             "$RUNNER_TEMP/gooo-origin" resolve \
               --contract .gooo/origin-resolver.gooo \
               --repo-root "$GITHUB_WORKSPACE" \
-              --output "$RUNNER_TEMP/gooo-artifacts/origin-resolve.json"
+              --output "$RUNNER_TEMP/gooo-artifacts/origin-resolve.json" \
+              --human-output "$RUNNER_TEMP/gooo-artifacts/origin-resolve.md"
           '
           conformance_status=$?
           conformance_end=$(date +%s%3N)
@@ -97,7 +98,7 @@ jobs:
           /usr/bin/time -f '%M' -o "$RUNNER_TEMP/integration.rss" sh -c '
             "$RUNNER_TEMP/gooo-origin" emit \
               --contract .gooo/origin-resolver.gooo \
-              --scenario normal-nested-expansion \
+              --scenario nested-quasiquote \
               --repo-root "$GITHUB_WORKSPACE" \
               --output "$RUNNER_TEMP/gooo-artifacts/generated_capture_free.go" &&
             go build -o "$RUNNER_TEMP/generated-capture-free" "$RUNNER_TEMP/gooo-artifacts/generated_capture_free.go"
