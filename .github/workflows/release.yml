@@ -57,13 +57,25 @@ jobs:
           git archive --format=tar.gz --prefix="gooo-hygienic-origin-resolver-${{ inputs.next_tag }}/" "$GITHUB_SHA" > "$source_asset"
           tar -czf "$evidence_asset" -C "$evidence_dir" .
           sha256sum "$source_asset" "$evidence_asset" | sed 's#  .*/#  #' > "$RUNNER_TEMP/SHA256SUMS"
+      - name: Create the annotated next patch tag after the guard
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          tag_object_sha=$(gh api --method POST "repos/$GITHUB_REPOSITORY/git/tags" \
+            -f "tag=${{ inputs.next_tag }}" \
+            -f "message=gooo ${{ inputs.next_tag }}" \
+            -f "object=$GITHUB_SHA" \
+            -f "type=commit" --jq '.sha')
+          gh api --method POST "repos/$GITHUB_REPOSITORY/git/refs" \
+            -f "ref=refs/tags/${{ inputs.next_tag }}" \
+            -f "sha=$tag_object_sha"
       - name: Create the next release as a draft
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           gh release create "${{ inputs.next_tag }}" \
             --repo "$GITHUB_REPOSITORY" \
-            --target "$GITHUB_SHA" \
+            --target "${{ inputs.next_tag }}" \
             --draft \
             --title "${{ inputs.next_tag }} — staged quasiquote origin expansion" \
             --notes "Immutable draft-first release from successful main evidence; v0.1.1 release, tag, and assets are verified and not modified." \
