@@ -148,7 +148,7 @@ type annotatedTagMetadata struct {
 	} `json:"object"`
 }
 
-func VerifyReleaseLineage(ctx context.Context, repo string, previousReleaseID, mainRunID int64, nextTag, currentSHA string, contract Contract) (ReleaseGuardReport, error) {
+func VerifyReleaseLineage(ctx context.Context, repo string, previousReleaseID, mainRunID int64, nextTag, currentSHA, contractAuthority, contractSchema string) (ReleaseGuardReport, error) {
 	guard := ReleaseGuardReport{
 		Schema:            "gooo.release-guard/v1",
 		Repository:        repo,
@@ -161,11 +161,8 @@ func VerifyReleaseLineage(ctx context.Context, repo string, previousReleaseID, m
 	if repo == "" || previousReleaseID < 1 || mainRunID < 1 || nextTag == "" || currentSHA == "" {
 		return guard, errors.New("release guard requires repository, release id, main run id, next tag, and current SHA")
 	}
-	if contract.Authority != "metacode" || contract.Schema != "gooo.origin-resolver/v2" || !contract.Semantics.NoAggregateScores {
+	if contractAuthority != "metacode" || contractSchema != "gooo.origin-resolver/v2" {
 		return guard, errors.New("release guard requires authoritative v2 metacode without aggregate reporting")
-	}
-	if err := contract.Semantics.Denominator.Validate(); err != nil {
-		return guard, err
 	}
 	observer := githubObserver{baseURL: defaultGitHubAPI, token: os.Getenv("GITHUB_TOKEN"), client: http.DefaultClient}
 	if observer.token == "" {

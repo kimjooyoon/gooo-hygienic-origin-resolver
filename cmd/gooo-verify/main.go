@@ -52,7 +52,7 @@ func runReleaseGuard(args []string) {
 	if err != nil {
 		fail(err)
 	}
-	guard, err := gooo.VerifyReleaseLineage(context.Background(), *repo, *previousReleaseID, *mainRunID, *nextTag, *currentSHA, contract)
+	guard, err := gooo.VerifyReleaseLineage(context.Background(), *repo, *previousReleaseID, *mainRunID, *nextTag, *currentSHA, contract.Authority, contract.Schema)
 	if err != nil {
 		writeReport(*outputPath, *repoRoot, guard)
 		fail(err)
