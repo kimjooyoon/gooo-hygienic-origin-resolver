@@ -95,6 +95,7 @@
     {"id": "origin.ref.sibling.left.x", "source": "fixtures/macro.gooo", "line": 52, "column": 12, "label": "sibling left reference"},
     {"id": "origin.ref.sibling.right.x", "source": "fixtures/macro.gooo", "line": 53, "column": 12, "label": "sibling right reference"},
     {"id": "origin.ref.grant.x", "source": "fixtures/macro.gooo", "line": 61, "column": 12, "label": "explicit caller reference"},
+    {"id": "origin.ref.missing.grant", "source": "fixtures/macro.gooo", "line": 62, "column": 12, "label": "caller reference without grant"},
     {"id": "origin.ref.forged.x", "source": "fixtures/macro.gooo", "line": 81, "column": 12, "label": "forged grant reference"},
     {"id": "origin.ref.implicit.x", "source": "fixtures/macro.gooo", "line": 82, "column": 12, "label": "implicit caller reference"},
     {"id": "origin.ref.fixed.x", "source": "fixtures/macro.gooo", "line": 91, "column": 12, "label": "fixed binder capture reference"}
@@ -158,6 +159,7 @@
     {"id": "sibling.left.ref", "spelling": "x", "reference_origin": "origin.ref.sibling.left.x", "expansion_origin": "exp.sibling", "scope": "sibling", "target_symbol": "sibling.left.x", "capture_policy": "fresh", "stage": 1},
     {"id": "sibling.right.ref", "spelling": "x", "reference_origin": "origin.ref.sibling.right.x", "expansion_origin": "exp.sibling", "scope": "sibling", "target_symbol": "sibling.right.x", "capture_policy": "fresh", "stage": 1},
     {"id": "grant.ref", "spelling": "x", "reference_origin": "origin.ref.grant.x", "expansion_origin": "exp.grant", "scope": "grant", "target_symbol": "user.x", "capture_policy": "intentional", "capture_grant": "grant.valid", "stage": 1},
+    {"id": "missing.grant.ref", "spelling": "x", "reference_origin": "origin.ref.missing.grant", "expansion_origin": "exp.grant", "scope": "grant", "target_symbol": "user.x", "capture_policy": "intentional", "stage": 1},
     {"id": "missing.ref", "spelling": "broken", "reference_origin": "", "expansion_origin": "exp.stage", "scope": "missing", "target_symbol": "missing.origin", "capture_policy": "fresh", "stage": 1},
     {"id": "forged.ref", "spelling": "x", "reference_origin": "origin.ref.forged.x", "expansion_origin": "exp.forged", "scope": "forged", "target_symbol": "user.x", "capture_policy": "intentional", "capture_grant": "grant.forged", "stage": 1},
     {"id": "implicit.ref", "spelling": "x", "reference_origin": "origin.ref.implicit.x", "expansion_origin": "exp.implicit", "scope": "implicit", "target_symbol": "user.x", "capture_policy": "implicit", "stage": 1},
@@ -206,8 +208,8 @@
       "form": {"kind": "quasiquote", "stage": 0, "origin": "syntax.ambiguous.root", "expansion_origin": "exp.source", "children": [{"kind": "quasiquote", "stage": 1, "origin": "syntax.ambiguous.inner", "expansion_origin": "exp.stage", "children": [{"kind": "splice", "stage": 1, "origin": "syntax.ambiguous.splice", "expansion_origin": "exp.stage", "children": [{"kind": "binder", "stage": 1, "origin": "origin.ambiguous.x", "symbol": "ambiguous.x"}]}]}]}
     },
     {
-      "id": "missing-grant", "description": "an intentional caller target without a declared capability grant is UNKNOWN", "root_scope": "root", "declared_symbols": ["user.x"], "introduced_symbols": [], "reference_symbols": ["grant.ref"], "expected_status": "UNKNOWN",
-      "form": {"kind": "quasiquote", "stage": 0, "origin": "syntax.missing.grant", "expansion_origin": "exp.source", "children": [{"kind": "reference", "stage": 1, "origin": "origin.ref.grant.x", "reference": "grant.ref"}]}
+      "id": "missing-grant", "description": "an intentional caller target without a declared capability grant is UNKNOWN", "root_scope": "root", "declared_symbols": ["user.x"], "introduced_symbols": [], "reference_symbols": ["missing.grant.ref"], "expected_status": "UNKNOWN",
+      "form": {"kind": "quasiquote", "stage": 0, "origin": "syntax.missing.grant", "expansion_origin": "exp.source", "children": [{"kind": "reference", "stage": 1, "origin": "origin.ref.missing.grant", "reference": "missing.grant.ref"}]}
     },
     {
       "id": "missing-expansion-origin", "description": "a form without an expansion origin cannot close its origin stack", "root_scope": "root", "declared_symbols": ["user.x"], "introduced_symbols": [], "reference_symbols": [], "expected_status": "UNKNOWN",
