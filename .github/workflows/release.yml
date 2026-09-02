@@ -75,7 +75,7 @@ jobs:
         run: |
           gh release create "${{ inputs.next_tag }}" \
             --repo "$GITHUB_REPOSITORY" \
-            --target "${{ inputs.next_tag }}" \
+            --target "$GITHUB_SHA" \
             --draft \
             --title "${{ inputs.next_tag }} — staged quasiquote origin expansion" \
             --notes "Immutable draft-first release from successful main evidence; v0.1.1 release, tag, and assets are verified and not modified." \
