@@ -10,11 +10,12 @@ import (
 	"strings"
 
 	"github.com/kimjooyoon/gooo-hygienic-origin-resolver/internal/gooo"
+	"github.com/kimjooyoon/gooo-hygienic-origin-resolver/internal/originresolver"
 )
 
 func main() {
 	if len(os.Args) < 2 {
-		fail(errors.New("command is required: verify, plan, conformance, or evidence"))
+		fail(errors.New("command is required: verify, plan, conformance, evidence, release-guard, or release-lock"))
 	}
 	switch os.Args[1] {
 	case "verify":
@@ -25,9 +26,65 @@ func main() {
 		runConformance(os.Args[2:])
 	case "evidence":
 		runEvidence(os.Args[2:])
+	case "release-guard":
+		runReleaseGuard(os.Args[2:])
+	case "release-lock":
+		runReleaseLock(os.Args[2:])
 	default:
 		fail(fmt.Errorf("unknown command %q", os.Args[1]))
 	}
+}
+
+func runReleaseGuard(args []string) {
+	flags := flag.NewFlagSet("release-guard", flag.ContinueOnError)
+	contractPath := flags.String("contract", ".gooo/origin-resolver.gooo", "authoritative .gooo contract")
+	outputPath := flags.String("output", "", "caller-owned guard report")
+	repoRoot := flags.String("repo-root", ".", "target repository root")
+	repo := flags.String("repo", os.Getenv("GITHUB_REPOSITORY"), "owner/name repository")
+	previousReleaseID := flags.Int64("previous-release-id", 0, "immutable previous release id")
+	mainRunID := flags.Int64("main-run-id", 0, "successful main evidence run id")
+	nextTag := flags.String("next-tag", "", "next patch tag")
+	currentSHA := flags.String("current-sha", os.Getenv("GITHUB_SHA"), "current main commit SHA")
+	if err := flags.Parse(args); err != nil {
+		fail(err)
+	}
+	contract, _, err := originresolverContract(*contractPath)
+	if err != nil {
+		fail(err)
+	}
+	guard, err := gooo.VerifyReleaseLineage(context.Background(), *repo, *previousReleaseID, *mainRunID, *nextTag, *currentSHA, contract)
+	if err != nil {
+		writeReport(*outputPath, *repoRoot, guard)
+		fail(err)
+	}
+	writeReport(*outputPath, *repoRoot, guard)
+}
+
+func runReleaseLock(args []string) {
+	flags := flag.NewFlagSet("release-lock", flag.ContinueOnError)
+	repo := flags.String("repo", os.Getenv("GITHUB_REPOSITORY"), "owner/name repository")
+	tag := flags.String("tag", "", "release tag")
+	tagObjectSHA := flags.String("tag-object-sha", "", "annotated tag object SHA")
+	targetCommitSHA := flags.String("target-commit-sha", "", "annotated tag target commit SHA")
+	evidenceArtifact := flags.String("evidence-artifact", "gooo-evidence", "evidence artifact name")
+	runID := flags.Int64("run-id", 0, "successful main evidence run id")
+	sourcePath := flags.String("source", "", "source archive")
+	evidencePath := flags.String("evidence", "", "evidence archive")
+	sumsPath := flags.String("sums", "", "SHA256SUMS file")
+	outputPath := flags.String("output", "", "caller-owned release lock output")
+	repoRoot := flags.String("repo-root", ".", "target repository root")
+	if err := flags.Parse(args); err != nil {
+		fail(err)
+	}
+	lock, err := gooo.BuildReleaseLock(*repo, *tag, *tagObjectSHA, *targetCommitSHA, *evidenceArtifact, *runID, *sourcePath, *evidencePath, *sumsPath)
+	if err != nil {
+		fail(err)
+	}
+	writeReport(*outputPath, *repoRoot, lock)
+}
+
+func originresolverContract(path string) (originresolver.Spec, []byte, error) {
+	return originresolver.LoadSpec(path)
 }
 
 func runVerify(args []string) {

@@ -1,0 +1,99 @@
+name: gooo-release
+
+on:
+  workflow_dispatch:
+    inputs:
+      previous_release_id:
+        description: Immutable previous release id
+        required: true
+        default: '380148937'
+      main_run_id:
+        description: Successful main gooo-ci run for this commit
+        required: true
+      next_tag:
+        description: Next available patch tag
+        required: true
+        default: v0.1.2
+
+permissions:
+  contents: write
+  actions: read
+
+jobs:
+  draft-first-immutable-release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-go@v6
+        with:
+          go-version: '1.27.x'
+          cache: true
+      - name: Build release guard from the checked-in source
+        run: go build -o "$RUNNER_TEMP/gooo-verify" ./cmd/gooo-verify
+      - name: Fail closed before any release mutation
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          "$RUNNER_TEMP/gooo-verify" release-guard \
+            --contract .gooo/origin-resolver.gooo \
+            --repo-root "$GITHUB_WORKSPACE" \
+            --repo "$GITHUB_REPOSITORY" \
+            --previous-release-id "${{ inputs.previous_release_id }}" \
+            --main-run-id "${{ inputs.main_run_id }}" \
+            --next-tag "${{ inputs.next_tag }}" \
+            --current-sha "$GITHUB_SHA" \
+            --output "$RUNNER_TEMP/release-guard.json"
+      - name: Collect caller-owned release outputs
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          source_asset="$RUNNER_TEMP/gooo-hygienic-origin-resolver-${{ inputs.next_tag }}.tar.gz"
+          evidence_asset="$RUNNER_TEMP/gooo-hygienic-origin-resolver-${{ inputs.next_tag }}-evidence.tar.gz"
+          evidence_dir="$RUNNER_TEMP/main-evidence"
+          mkdir -p "$evidence_dir"
+          gh run download "${{ inputs.main_run_id }}" --repo "$GITHUB_REPOSITORY" --name gooo-evidence --dir "$evidence_dir"
+          git archive --format=tar.gz --prefix="gooo-hygienic-origin-resolver-${{ inputs.next_tag }}/" "$GITHUB_SHA" > "$source_asset"
+          tar -czf "$evidence_asset" -C "$evidence_dir" .
+          sha256sum "$source_asset" "$evidence_asset" | sed 's#  .*/#  #' > "$RUNNER_TEMP/SHA256SUMS"
+      - name: Create the next release as a draft
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create "${{ inputs.next_tag }}" \
+            --repo "$GITHUB_REPOSITORY" \
+            --target "$GITHUB_SHA" \
+            --draft \
+            --title "${{ inputs.next_tag }} — staged quasiquote origin expansion" \
+            --notes "Immutable draft-first release from successful main evidence; v0.1.1 release, tag, and assets are verified and not modified." \
+            "$RUNNER_TEMP/gooo-hygienic-origin-resolver-${{ inputs.next_tag }}.tar.gz" \
+            "$RUNNER_TEMP/gooo-hygienic-origin-resolver-${{ inputs.next_tag }}-evidence.tar.gz" \
+            "$RUNNER_TEMP/SHA256SUMS"
+      - name: Bind the immutable release lock to the new annotated tag
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          tag_object_sha=$(gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/${{ inputs.next_tag }}" --jq '.object.sha')
+          target_commit_sha=$(gh api "repos/$GITHUB_REPOSITORY/git/tags/$tag_object_sha" --jq '.object.sha')
+          "$RUNNER_TEMP/gooo-verify" release-lock \
+            --repo "$GITHUB_REPOSITORY" \
+            --tag "${{ inputs.next_tag }}" \
+            --tag-object-sha "$tag_object_sha" \
+            --target-commit-sha "$target_commit_sha" \
+            --run-id "${{ inputs.main_run_id }}" \
+            --source "$RUNNER_TEMP/gooo-hygienic-origin-resolver-${{ inputs.next_tag }}.tar.gz" \
+            --evidence "$RUNNER_TEMP/gooo-hygienic-origin-resolver-${{ inputs.next_tag }}-evidence.tar.gz" \
+            --sums "$RUNNER_TEMP/SHA256SUMS" \
+            --repo-root "$GITHUB_WORKSPACE" \
+            --output "$RUNNER_TEMP/release-lock-${{ inputs.next_tag }}.json"
+          gh release upload "${{ inputs.next_tag }}" "$RUNNER_TEMP/release-lock-${{ inputs.next_tag }}.json" --repo "$GITHUB_REPOSITORY"
+      - name: Publish draft and assert immutable release state
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release edit "${{ inputs.next_tag }}" --repo "$GITHUB_REPOSITORY" --draft=false
+          immutable=$(gh api "repos/$GITHUB_REPOSITORY/releases/tags/${{ inputs.next_tag }}" --jq '.immutable')
+          draft=$(gh api "repos/$GITHUB_REPOSITORY/releases/tags/${{ inputs.next_tag }}" --jq '.draft')
+          test "$immutable" = true
+          test "$draft" = false
