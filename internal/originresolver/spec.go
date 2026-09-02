@@ -41,6 +41,7 @@ type Semantics struct {
 	Identity                     IdentityRule      `json:"identity"`
 	AlphaRenaming                AlphaRenamingRule `json:"alpha_renaming"`
 	CaptureJudgment              CaptureJudgment   `json:"capture_judgment"`
+	FixedPoint                   string            `json:"fixed_point"`
 	StatusPrecedence             []Status          `json:"status_precedence"`
 	Unknown                      UnknownRule       `json:"unknown"`
 	Denominator                  Denominator       `json:"denominator"`
@@ -250,6 +251,9 @@ func (s Spec) Validate() error {
 	}
 	if s.Semantics.AlphaRenaming.FreshPolicy != "fresh" || s.Semantics.AlphaRenaming.Separator == "" || s.Semantics.AlphaRenaming.IdentityChars < 8 {
 		return errors.New("alpha-renaming semantics are incomplete")
+	}
+	if s.Semantics.FixedPoint != "FIXED_POINT" {
+		return errors.New("only the explicit FIXED_POINT semantic is allowed")
 	}
 	if !equal(s.Semantics.StatusPrecedence, []Status{StatusRefuted, StatusUnknown, StatusClosed}) {
 		return errors.New("status precedence must be REFUTED > UNKNOWN > CLOSED")

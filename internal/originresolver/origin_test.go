@@ -24,6 +24,9 @@ func fixtureSpec(t *testing.T) Spec {
 
 func TestContractVectorAndDeclaredCases(t *testing.T) {
 	spec := fixtureSpec(t)
+	if spec.Semantics.FixedPoint != "FIXED_POINT" {
+		t.Fatalf("got fixed point %q", spec.Semantics.FixedPoint)
+	}
 	all, err := ResolveAll(spec)
 	if err != nil {
 		t.Fatal(err)

@@ -11,6 +11,7 @@
       "prefix": "sym_"
     },
     "alpha_renaming": {"fresh_policy": "fresh", "separator": "__gooo_", "identity_chars": 16},
+    "fixed_point": "FIXED_POINT",
     "capture_judgment": {
       "fresh_collision": "ALPHA_RENAME",
       "intended_target": "INTENDED_CAPTURE",
