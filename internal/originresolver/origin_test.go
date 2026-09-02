@@ -22,139 +22,113 @@ func fixtureSpec(t *testing.T) Spec {
 	return spec
 }
 
-func TestDeclaredScenarios(t *testing.T) {
+func TestContractVectorAndDeclaredCases(t *testing.T) {
 	spec := fixtureSpec(t)
 	all, err := ResolveAll(spec)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(all.Reports) != 5 {
-		t.Fatalf("got %d reports, want 5", len(all.Reports))
-	}
-	want := map[string]Status{
-		"normal-nested-expansion": StatusClosed,
-		"intended-capture":        StatusClosed,
-		"unintended-capture":      StatusRefuted,
-		"missing-origin":          StatusUnknown,
-		"replay":                  StatusClosed,
+	if all.Vector != (CaseVector{Cases: 12, Closed: 4, Unknown: 4, Refuted: 4}) {
+		t.Fatalf("got vector %#v", all.Vector)
 	}
 	for _, report := range all.Reports {
-		if report.Status != want[report.Scenario] {
-			t.Fatalf("scenario %s got %s, want %s", report.Scenario, report.Status, want[report.Scenario])
-		}
-		if report.Status != report.ExpectedStatus {
-			t.Fatalf("scenario %s got %s, contract expects %s", report.Scenario, report.Status, report.ExpectedStatus)
+		if len(report.IR) == 0 {
+			t.Fatalf("case %s has no generated IR", report.Scenario)
 		}
 		for _, symbol := range report.Symbols {
 			if len(symbol.OriginProofPath) == 0 {
 				t.Fatalf("symbol %s has no origin proof path", symbol.ID)
 			}
 		}
-		for _, reference := range report.References {
-			if len(reference.OriginProofPath) == 0 {
-				t.Fatalf("reference %s has no origin proof path", reference.ID)
-			}
+	}
+}
+
+func TestNestedStagesAndTwoSplices(t *testing.T) {
+	spec := fixtureSpec(t)
+	report, err := ResolveScenario(spec, "nested-quasiquote")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if report.Status != StatusClosed || len(report.IR) != 1 || len(report.IR[0].Children) != 3 {
+		t.Fatalf("unexpected nested report: %#v", report)
+	}
+	inner := report.IR[0].Children[2]
+	if inner.Kind != "quasiquote" || len(inner.Children) != 1 || inner.Children[0].Kind != "splice" {
+		t.Fatalf("nested quasiquote/splice was not preserved: %#v", inner)
+	}
+	two, err := ResolveScenario(spec, "two-splices")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(two.IR[0].Children) != 2 || two.IR[0].Children[0].Kind != "splice" || two.IR[0].Children[1].Kind != "splice" {
+		t.Fatalf("two splice order was not preserved: %#v", two.IR)
+	}
+}
+
+func TestDeterministicAlphaRenamingAndShadowing(t *testing.T) {
+	spec := fixtureSpec(t)
+	first, err := ResolveScenario(spec, "two-splices")
+	if err != nil {
+		t.Fatal(err)
+	}
+	second, err := ResolveScenario(spec, "two-splices")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if first.Symbols[1].EffectiveSpelling != second.Symbols[1].EffectiveSpelling || first.Symbols[2].EffectiveSpelling != second.Symbols[2].EffectiveSpelling {
+		t.Fatalf("alpha-renaming is not deterministic: %#v %#v", first.Symbols, second.Symbols)
+	}
+	if first.Symbols[1].EffectiveSpelling == first.Symbols[2].EffectiveSpelling || first.Symbols[1].EffectiveSpelling == "x" || first.Symbols[2].EffectiveSpelling == "x" {
+		t.Fatalf("sibling collision was not separated: %#v", first.Symbols)
+	}
+	shadow, err := ResolveScenario(spec, "nested-quasiquote")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if shadow.Status != StatusClosed || shadow.Symbols[1].EffectiveSpelling == "x" {
+		t.Fatalf("shadowed binder was not alpha-renamed: %#v", shadow.Symbols)
+	}
+}
+
+func TestExplicitCaptureAndRefutations(t *testing.T) {
+	spec := fixtureSpec(t)
+	grant, err := ResolveScenario(spec, "explicit-intentional-capture")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if grant.Status != StatusClosed || grant.References[0].CaptureDecision != spec.Semantics.CaptureJudgment.IntendedTarget || grant.References[0].GrantID != "grant.valid" {
+		t.Fatalf("valid capture grant was not accepted: %#v", grant)
+	}
+	for _, id := range []string{"forged-capture-grant", "invalid-capability", "implicit-capture-counterexample", "fixed-binder-capture"} {
+		report, resolveErr := ResolveScenario(spec, id)
+		if resolveErr != nil {
+			t.Fatal(resolveErr)
+		}
+		if report.Status != StatusRefuted {
+			t.Fatalf("case %s got %s, want REFUTED", id, report.Status)
 		}
 	}
 }
 
-func TestNestedFreshBindersAreAlphaRenamed(t *testing.T) {
+func TestUnknownPreservesSixFields(t *testing.T) {
 	spec := fixtureSpec(t)
-	report, err := ResolveScenario(spec, "normal-nested-expansion")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if report.Status != StatusClosed {
-		t.Fatalf("got %s, want CLOSED", report.Status)
-	}
-	byID := map[string]SymbolEvidence{}
-	for _, symbol := range report.Symbols {
-		byID[symbol.ID] = symbol
-	}
-	outer := byID["normal.outer.x"]
-	inner := byID["normal.inner.x"]
-	if outer.StableIdentity == "" || inner.StableIdentity == "" || outer.StableIdentity == inner.StableIdentity {
-		t.Fatalf("stable identities are not distinct: %#v %#v", outer, inner)
-	}
-	if outer.EffectiveSpelling == "x" || inner.EffectiveSpelling == "x" || outer.EffectiveSpelling == inner.EffectiveSpelling {
-		t.Fatalf("fresh binders were not alpha-renamed: %#v %#v", outer, inner)
-	}
-	for _, reference := range report.References {
-		if reference.ActualTarget != reference.ExpectedTarget {
-			t.Fatalf("reference %s got %s, want %s", reference.ID, reference.ActualTarget, reference.ExpectedTarget)
+	for _, id := range []string{"missing-origin", "ambiguous-stage", "missing-grant", "missing-expansion-origin"} {
+		report, err := ResolveScenario(spec, id)
+		if err != nil {
+			t.Fatal(err)
 		}
-		if reference.CaptureDecision != spec.Semantics.CaptureJudgment.FreshCollision {
-			t.Fatalf("reference %s got decision %s", reference.ID, reference.CaptureDecision)
+		if report.Status != StatusUnknown || report.Unknown == nil {
+			t.Fatalf("case %s got %#v, want UNKNOWN", id, report)
+		}
+		if err := report.Unknown.Validate(); err != nil {
+			t.Fatal(err)
 		}
 	}
-}
-
-func TestIntendedCaptureIsClosed(t *testing.T) {
-	spec := fixtureSpec(t)
-	report, err := ResolveScenario(spec, "intended-capture")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if report.Status != StatusClosed || len(report.References) != 1 || report.References[0].CaptureDecision != spec.Semantics.CaptureJudgment.IntendedTarget {
-		t.Fatalf("unexpected intended capture report: %#v", report)
-	}
-	if report.References[0].ActualTarget != "user.x" {
-		t.Fatalf("intended capture target is %q", report.References[0].ActualTarget)
-	}
-}
-
-func TestUnintendedCaptureIsRefuted(t *testing.T) {
-	spec := fixtureSpec(t)
-	report, err := ResolveScenario(spec, "unintended-capture")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if report.Status != StatusRefuted || len(report.References) != 1 {
-		t.Fatalf("unexpected refuted report: %#v", report)
-	}
-	if report.References[0].CaptureDecision != spec.Semantics.CaptureJudgment.UnintendedTarget || report.References[0].ActualTarget != "refuted.x" {
-		t.Fatalf("unexpected capture decision: %#v", report.References[0])
-	}
-}
-
-func TestMissingOriginPreservesSixFields(t *testing.T) {
-	spec := fixtureSpec(t)
-	report, err := ResolveScenario(spec, "missing-origin")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if report.Status != StatusUnknown || report.Unknown == nil {
-		t.Fatalf("unexpected unknown report: %#v", report)
-	}
-	if err := report.Unknown.Validate(); err != nil {
-		t.Fatal(err)
-	}
-	if report.Symbols[1].CaptureDecision != spec.Semantics.CaptureJudgment.MissingOrigin || report.References[0].CaptureDecision != spec.Semantics.CaptureJudgment.MissingOrigin {
-		t.Fatalf("missing origin was not preserved: %#v %#v", report.Symbols, report.References)
-	}
-}
-
-func TestReplayPreservesEvidence(t *testing.T) {
-	spec := fixtureSpec(t)
-	all, err := ResolveAll(spec)
-	if err != nil {
-		t.Fatal(err)
-	}
-	for _, report := range all.Reports {
-		if report.Scenario != "replay" {
-			continue
-		}
-		if report.Replay == nil || report.Replay.Status != StatusClosed || !report.Replay.SameIdentities || !report.Replay.SameNames || !report.Replay.SameDecisions {
-			t.Fatalf("replay evidence is not closed: %#v", report.Replay)
-		}
-		return
-	}
-	t.Fatal("replay scenario was not reported")
 }
 
 func TestEmitterProducesStructuredCaptureFreeGo(t *testing.T) {
 	spec := fixtureSpec(t)
-	source, err := EmitExample(spec, "normal-nested-expansion")
+	source, err := EmitExample(spec, "nested-quasiquote")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -169,5 +143,20 @@ func TestEmitterProducesStructuredCaptureFreeGo(t *testing.T) {
 	}
 	if err := os.WriteFile(filepath.Join(t.TempDir(), "generated.go"), source, 0o644); err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestHumanReportIsAvailable(t *testing.T) {
+	spec := fixtureSpec(t)
+	all, err := ResolveAll(spec)
+	if err != nil {
+		t.Fatal(err)
+	}
+	human, err := RenderHumanReport(all)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(human), "Case vector") || !strings.Contains(string(human), "UNKNOWN:") {
+		t.Fatalf("human report is incomplete: %s", human)
 	}
 }

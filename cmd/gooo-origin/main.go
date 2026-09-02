@@ -30,6 +30,7 @@ func runResolve(args []string) {
 	contractPath := flags.String("contract", ".gooo/origin-resolver.gooo", "authoritative .gooo contract")
 	scenarioID := flags.String("scenario", "", "scenario id; empty resolves all scenarios")
 	outputPath := flags.String("output", "", "caller-owned report output")
+	humanOutputPath := flags.String("human-output", "", "caller-owned human-readable report output")
 	repoRoot := flags.String("repo-root", ".", "target repository root")
 	if err := flags.Parse(args); err != nil {
 		fail(err)
@@ -60,6 +61,15 @@ func runResolve(args []string) {
 	}
 	if err := originresolver.WriteCallerFile(*outputPath, *repoRoot, append(encoded, '\n')); err != nil {
 		fail(err)
+	}
+	if *humanOutputPath != "" {
+		human, humanErr := originresolver.RenderHumanReport(value)
+		if humanErr != nil {
+			fail(humanErr)
+		}
+		if err := originresolver.WriteCallerFile(*humanOutputPath, *repoRoot, human); err != nil {
+			fail(err)
+		}
 	}
 }
 
