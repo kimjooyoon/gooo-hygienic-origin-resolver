@@ -13,6 +13,10 @@ on:
       next_tag:
         description: Next available patch tag
         required: true
+        default: v0.1.3
+      burned_tags:
+        description: Prior failed tags that are permanently prohibited from reuse
+        required: true
         default: v0.1.2
 
 permissions:
@@ -43,6 +47,7 @@ jobs:
             --previous-release-id "${{ inputs.previous_release_id }}" \
             --main-run-id "${{ inputs.main_run_id }}" \
             --next-tag "${{ inputs.next_tag }}" \
+            --burned-tags "${{ inputs.burned_tags }}" \
             --current-sha "$GITHUB_SHA" \
             --output "$RUNNER_TEMP/release-guard.json"
       - name: Collect caller-owned release outputs

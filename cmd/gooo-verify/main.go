@@ -44,6 +44,7 @@ func runReleaseGuard(args []string) {
 	previousReleaseID := flags.Int64("previous-release-id", 0, "immutable previous release id")
 	mainRunID := flags.Int64("main-run-id", 0, "successful main evidence run id")
 	nextTag := flags.String("next-tag", "", "next patch tag")
+	burnedTags := flags.String("burned-tags", "", "comma-separated prior failed tags that must remain absent")
 	currentSHA := flags.String("current-sha", os.Getenv("GITHUB_SHA"), "current main commit SHA")
 	if err := flags.Parse(args); err != nil {
 		fail(err)
@@ -52,12 +53,26 @@ func runReleaseGuard(args []string) {
 	if err != nil {
 		fail(err)
 	}
-	guard, err := gooo.VerifyReleaseLineage(context.Background(), *repo, *previousReleaseID, *mainRunID, *nextTag, *currentSHA, contract.Authority, contract.Schema)
+	guard, err := gooo.VerifyReleaseLineage(context.Background(), *repo, *previousReleaseID, *mainRunID, *nextTag, *currentSHA, contract.Authority, contract.Schema, splitCSV(*burnedTags))
 	if err != nil {
 		writeReport(*outputPath, *repoRoot, guard)
 		fail(err)
 	}
 	writeReport(*outputPath, *repoRoot, guard)
+}
+
+func splitCSV(value string) []string {
+	if strings.TrimSpace(value) == "" {
+		return nil
+	}
+	parts := strings.Split(value, ",")
+	result := make([]string, 0, len(parts))
+	for _, part := range parts {
+		if trimmed := strings.TrimSpace(part); trimmed != "" {
+			result = append(result, trimmed)
+		}
+	}
+	return result
 }
 
 func runReleaseLock(args []string) {

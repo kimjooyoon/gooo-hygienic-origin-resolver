@@ -21,6 +21,7 @@ type ReleaseGuardReport struct {
 	PreviousReleaseID int64           `json:"previous_release_id"`
 	PreviousTag       string          `json:"previous_tag"`
 	NextTag           string          `json:"next_tag"`
+	BurnedTags        []string        `json:"burned_tags,omitempty"`
 	MainRunID         int64           `json:"main_run_id"`
 	Status            Status          `json:"status"`
 	Checks            []GuardCheck    `json:"checks"`
@@ -148,12 +149,13 @@ type annotatedTagMetadata struct {
 	} `json:"object"`
 }
 
-func VerifyReleaseLineage(ctx context.Context, repo string, previousReleaseID, mainRunID int64, nextTag, currentSHA, contractAuthority, contractSchema string) (ReleaseGuardReport, error) {
+func VerifyReleaseLineage(ctx context.Context, repo string, previousReleaseID, mainRunID int64, nextTag, currentSHA, contractAuthority, contractSchema string, burnedTags []string) (ReleaseGuardReport, error) {
 	guard := ReleaseGuardReport{
 		Schema:            "gooo.release-guard/v1",
 		Repository:        repo,
 		PreviousReleaseID: previousReleaseID,
 		NextTag:           nextTag,
+		BurnedTags:        append([]string{}, burnedTags...),
 		MainRunID:         mainRunID,
 		Status:            StatusUnknown,
 		Checks:            make([]GuardCheck, 0, 12),
@@ -235,6 +237,25 @@ func VerifyReleaseLineage(ctx context.Context, repo string, previousReleaseID, m
 	if err != nil {
 		return guard, err
 	}
+	for containsString(burnedTags, expectedNext) {
+		releaseStatus, releaseErr := observer.getStatus(ctx, fmt.Sprintf("/repos/%s/releases/tags/%s", repo, expectedNext))
+		if releaseErr != nil {
+			return guard, releaseErr
+		}
+		refStatus, refErr := observer.getStatus(ctx, fmt.Sprintf("/repos/%s/git/ref/tags/%s", repo, expectedNext))
+		if refErr != nil {
+			return guard, refErr
+		}
+		absent := releaseStatus == http.StatusNotFound && refStatus == http.StatusNotFound
+		addGuardCheck(&guard, "burned-tag-absent:"+expectedNext, absent, fmt.Sprintf("release_status=%d ref_status=%d", releaseStatus, refStatus))
+		if !absent {
+			return guard, fmt.Errorf("burned tag %s is present and cannot be reused", expectedNext)
+		}
+		expectedNext, err = nextPatchTag(expectedNext)
+		if err != nil {
+			return guard, err
+		}
+	}
 	addGuardCheck(&guard, "next-patch-lineage", nextTag == expectedNext, fmt.Sprintf("previous=%s next=%s", release.TagName, nextTag))
 	if nextTag != expectedNext {
 		return guard, errors.New("next release must be the next available patch tag")
@@ -260,6 +281,15 @@ func addGuardCheck(guard *ReleaseGuardReport, id string, closed bool, detail str
 		status = "REFUTED"
 	}
 	guard.Checks = append(guard.Checks, GuardCheck{ID: id, Status: status, Detail: detail})
+}
+
+func containsString(values []string, wanted string) bool {
+	for _, value := range values {
+		if value == wanted {
+			return true
+		}
+	}
+	return false
 }
 
 func findReleaseAsset(release releaseMetadata, name string) (struct {
