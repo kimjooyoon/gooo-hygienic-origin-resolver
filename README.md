@@ -47,6 +47,9 @@ contract.
 
 The repository began from `gooo-repository-bootstrap` v0.1.1. The bootstrap
 commit is the only direct-main exception; functional changes are PR-only.
+The v0.1.2 release attempt is recorded as `OPERATIONAL_REFUTED` in
+[`docs/release-attempt-v0.1.2.json`](docs/release-attempt-v0.1.2.json); it is
+permanently burned, so the next release workflow requires fresh `v0.1.3`.
 
 ## Commands
 
