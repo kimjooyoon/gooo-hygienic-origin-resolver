@@ -67,11 +67,11 @@ func TestNestedStagesAndTwoSplices(t *testing.T) {
 
 func TestDeterministicAlphaRenamingAndShadowing(t *testing.T) {
 	spec := fixtureSpec(t)
-	first, err := ResolveScenario(spec, "sibling-binder-collision")
+	first, err := ResolveScenario(spec, "two-splices")
 	if err != nil {
 		t.Fatal(err)
 	}
-	second, err := ResolveScenario(spec, "sibling-binder-collision")
+	second, err := ResolveScenario(spec, "two-splices")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -81,7 +81,7 @@ func TestDeterministicAlphaRenamingAndShadowing(t *testing.T) {
 	if first.Symbols[1].EffectiveSpelling == first.Symbols[2].EffectiveSpelling || first.Symbols[1].EffectiveSpelling == "x" || first.Symbols[2].EffectiveSpelling == "x" {
 		t.Fatalf("sibling collision was not separated: %#v", first.Symbols)
 	}
-	shadow, err := ResolveScenario(spec, "shadowed-binder")
+	shadow, err := ResolveScenario(spec, "nested-quasiquote")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -99,7 +99,7 @@ func TestExplicitCaptureAndRefutations(t *testing.T) {
 	if grant.Status != StatusClosed || grant.References[0].CaptureDecision != spec.Semantics.CaptureJudgment.IntendedTarget || grant.References[0].GrantID != "grant.valid" {
 		t.Fatalf("valid capture grant was not accepted: %#v", grant)
 	}
-	for _, id := range []string{"forged-capture-grant", "implicit-capture-counterexample", "fixed-binder-capture"} {
+	for _, id := range []string{"forged-capture-grant", "invalid-capability", "implicit-capture-counterexample", "fixed-binder-capture"} {
 		report, resolveErr := ResolveScenario(spec, id)
 		if resolveErr != nil {
 			t.Fatal(resolveErr)

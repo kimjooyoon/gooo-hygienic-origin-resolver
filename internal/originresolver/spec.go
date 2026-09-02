@@ -388,7 +388,7 @@ func (s Spec) Validate() error {
 	if caseCounts[StatusClosed] != 4 || caseCounts[StatusUnknown] != 4 || caseCounts[StatusRefuted] != 4 {
 		return fmt.Errorf("case vector must be CLOSED/UNKNOWN/REFUTED 4/4/4")
 	}
-	for _, id := range []string{"nested-quasiquote", "two-splices", "shadowed-binder", "sibling-binder-collision", "explicit-intentional-capture", "missing-origin", "ambiguous-stage", "missing-grant", "missing-expansion-origin", "forged-capture-grant", "implicit-capture-counterexample", "fixed-binder-capture"} {
+	for _, id := range []string{"nested-quasiquote", "two-splices", "capture-free-base", "explicit-intentional-capture", "missing-origin", "ambiguous-stage", "missing-grant", "missing-expansion-origin", "forged-capture-grant", "invalid-capability", "implicit-capture-counterexample", "fixed-binder-capture"} {
 		if !seenCases[id] {
 			return fmt.Errorf("missing required case %q", id)
 		}
