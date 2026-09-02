@@ -21,6 +21,8 @@ The execution path is:
 The resolver is deliberately bounded by the contract's node, quote-depth,
 splice, and origin-hop limits. It does not claim complete hygiene for an
 unbounded language. `REFUTED` dominates `UNKNOWN`, which dominates `CLOSED`.
+The contract admits only the explicit `FIXED_POINT` semantic marker; no
+implicit or inferred fixed point is accepted.
 Missing origin, stage, or grant evidence stays `UNKNOWN` with all six fields:
 `stage`, `step`, `reason`, `unknown_class`, `next_operation`, and `blocked_by`.
 An intentional caller capture is closed only by a grant whose reference,
